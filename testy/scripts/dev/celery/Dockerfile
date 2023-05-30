@@ -16,4 +16,5 @@ COPY . /testy
 
 RUN pip install -r requirements/dev-requirements.txt
 RUN pip install -e plugins/migrator
+RUN pip install -e plugins/jira
 

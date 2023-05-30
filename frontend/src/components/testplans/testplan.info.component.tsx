@@ -14,6 +14,7 @@ import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import useStyles from "./styles.testplans";
 import {test, testPlan} from "../models.interfaces";
 import EditIcon from "@mui/icons-material/Edit";
+import MDEditor from "@uiw/react-md-editor";
 
 interface Props {
     currentTestPlan: testPlan;
@@ -57,11 +58,29 @@ const TestplanInfo: React.FC<Props> = ({
                     </Grid>
                 </Grid>
                 <Typography>
-                    {"Дата начала: " + moment(currentTestPlan.started_at, 'YYYY-MM-DDTHH:mm').format('MMMM D, YYYY HH:mm')}
+                    {"Дата начала: " + moment.utc(currentTestPlan.started_at, 'YYYY-MM-DDTHH:mm').local().format('MMMM D, YYYY HH:mm')}
                 </Typography>
                 <Typography>
-                    {"Дата окончания: " + moment(currentTestPlan.due_date, 'YYYY-MM-DDTHH:mm').format('MMMM D, YYYY HH:mm')}
+                    {"Дата окончания: " + moment.utc(currentTestPlan.due_date, 'YYYY-MM-DDTHH:mm').local().format('MMMM D, YYYY HH:mm')}
                 </Typography>
+                {/*{currentTestPlan.description &&*/}
+                {/*<div style={{display: 'flex', flexDirection: 'row'}}>*/}
+                {/*    <Typography style={{marginRight: "1%"}}>*/}
+                {/*        {"Описание:"}*/}
+                {/*    </Typography>*/}
+                {/*    <div style={{maxHeight: "500px"}}>*/}
+                {/*        /!*<Viewer initialValue={currentTestPlan.description}/>*!/*/}
+                {/*        <MDEditor.Markdown source={currentTestPlan.description} style={{whiteSpace: 'pre-wrap'}}/>*/}
+                {/*    </div>*/}
+
+                {/*</div>}*/}
+                {/*<div style={{display: 'flex', flexDirection: 'row'}}>*/}
+                    <Typography style={{marginRight: "1%"}}>
+                        {"Описание:"}
+                    </Typography>
+                    <MDEditor.Markdown source={currentTestPlan.description} style={{whiteSpace: 'pre-wrap', maxWidth: "90%"}}/>
+                {/*TODO ширина*/}
+                {/*</div>*/}
             </div>
             <TableContainer component={Paper}>
                 <Table>
@@ -79,9 +98,8 @@ const TestplanInfo: React.FC<Props> = ({
                                     />
                                 </TableCell>
                                 <TableCell className={classes.tableCellTests}>
-                                    {test.case.name}
+                                    {test.name}
                                 </TableCell>
-                                {test.test_results &&
                                 <TableCell className={classes.tableCellTests}>
                                     <Chip key={index} label={test.last_status_color.name}
                                           onClick={() => {
@@ -99,7 +117,7 @@ const TestplanInfo: React.FC<Props> = ({
                                               color: "white"
                                           }}/>
 
-                                </TableCell>}
+                                </TableCell>
                                 {(!detailedTestInfo || !detailedTestInfo.show) &&
                                 (< TableCell className={classes.tableCellTests}>
                                     {moment(test.updated_at).format('DD/MM/YYYY')}
@@ -110,7 +128,7 @@ const TestplanInfo: React.FC<Props> = ({
                                 </TableCell>)}
 
                                 <TableCell className={classes.tableCellTests}>
-                                    <IconButton size={"small"} onClick={() => {
+                                    <IconButton data-cy="icon-open-detailed-test-info" size={"small"} onClick={() => {
                                         detailedTestInfo ?
                                             detailedTestInfo.test.id === test.id ?
                                                 setDetailedTestInfo({

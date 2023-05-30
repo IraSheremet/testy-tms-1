@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from "react";
-import {attachment, test, user} from "../models.interfaces";
+import {attachment, test, testResult, user} from "../models.interfaces";
 import Chip from "@mui/material/Chip";
 import FormControl from "@mui/material/FormControl";
 import Grid from "@mui/material/Grid";
@@ -19,6 +19,10 @@ import ProfileService from "../../services/profile.service";
 import Attachments from "../attachment/attachments";
 import AttachmentButton from "../attachment/attachment_button";
 import AttachmentService from "../../services/attachment.servise";
+// import MDEditor from "@uiw/react-md-editor";
+import MarkdownPreview from '@uiw/react-markdown-preview';
+import {Editor} from "@toast-ui/react-editor";
+import SuiteCaseService from "../../services/suite.case.service";
 
 interface Props {
     detailedTestInfo: { show: boolean, test: test };
@@ -34,18 +38,19 @@ const DetailedTestInfo: React.FC<Props> = ({
                                                setShowEnterResult
                                            }) => {
     const classes = useStyles()
+    const [scenario, setScenario] = useState<string>()
+    const [description, setDescription] = useState<string>()
+    const [estimate, setEstimate] = useState<number>()
+    const [setup, setSetup] = useState<string>()
+    const [teardown, setTeardown] = useState<string>()
     const [selectedStatus, setSelectedStatus] = useState<{ id: number, name: string } | null>(null)
     const [attachments, setAttachments] = React.useState<Map<number, attachment[]>>(new Map())
     const [filesSelected, setFilesSelected] = React.useState<File[]>()
-    const [comment, setComment] = useState("")
+    const [value, setValue] = useState("")
     const [num, setNum] = useState<number>()
     const [names, setNames] = useState<Map<number, string>>(new Map())
     const test = detailedTestInfo.test
-
-    const onChangeComment = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        let str = e.target.value.trimStart()
-        setComment(str)
-    }
+    const editorRef = React.createRef();
 
     const onChangeExecutionTime = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         let num = Number(e.target.value)
@@ -53,30 +58,64 @@ const DetailedTestInfo: React.FC<Props> = ({
     }
 
     useEffect(() => {
+        new Promise<testResult[]>(async (resolve) => {
+            const response = await TestPlanService.getAllTestResults(test.id)
+            let testResults: testResult[] = response.data
+            for (const testResult of testResults) {
+
+                let status = statuses.find(i => i.id === testResult.status)
+                testResult.status_color = status ? status : defaultStatus
+            }
+            resolve(testResults)
+        }).then((testResults) => {
+            test.test_results = testResults
+            setDetailedTestInfo({show: true, test: test})
+        })
+
+    }, [test])
+
+    useEffect(() => {
         new Promise<[Map<number, string>, Map<number, attachment[]>]>(async (resolve) => {
             const namesMap: Map<number, string> = new Map()
             const attachmentsMap: Map<number, attachment[]> = new Map()
-            await Promise.all(test.test_results.map(async (result) => {
-                if (!result.user_full_name) {
-                    await ProfileService.getUser(result.user).then((response) => {
-                        const user: user = response.data
-                        namesMap.set(result.id, user.username)
-                    })
-                        .catch((e) => {
-                            console.log(e)
+            if (test.test_results) {
+                await Promise.all(test.test_results.map(async (result) => {
+                    if (!result.user_full_name) {
+                        await ProfileService.getUser(result.user).then((response) => {
+                            const user: user = response.data
+                            namesMap.set(result.id, user.username)
                         })
-                } else {
-                    namesMap.set(result.id, result.user_full_name)
-                }
-                const response = await TestPlanService.getTestResult(result.id)
-                attachmentsMap.set(result.id, response.data.attachments)
-            }))
+                            .catch((e) => {
+                                console.log(e)
+                            })
+                    } else {
+                        namesMap.set(result.id, result.user_full_name)
+                    }
+                    result.comment = result.comment ? (await TestPlanService.getJiraChangedComment(result.comment)).data : result.comment
+                    const response = await TestPlanService.getTestResult(result.id)
+                    attachmentsMap.set(result.id, response.data.attachments)
+                }))
+            }
+
             resolve([namesMap, attachmentsMap])
         }).then(([namesMap, attachmentsMap]) => {
             setNames(namesMap)
             setAttachments(attachmentsMap)
+        }).catch((e) => {
+            console.log(e)
         })
     }, [detailedTestInfo, test.test_results])
+
+
+    useEffect(() => {
+        SuiteCaseService.getCaseById(test.case).then(response => {
+            setScenario(response.data.scenario)
+            setDescription(response.data.description)
+            setEstimate(response.data.estimate)
+            setSetup(response.data.setup)
+            setTeardown(response.data.teardown)
+        })
+    }, [test.case])
 
     const handleShowEnterResult = () => setShowEnterResult(true)
     const chooseStatus = (e: any) => {
@@ -85,7 +124,7 @@ const DetailedTestInfo: React.FC<Props> = ({
 
     const handleClose = () => {
         setNum(0)
-        setComment("")
+        setValue("")
         setSelectedStatus(null)
         setShowEnterResult(false)
         setFilesSelected([])
@@ -93,9 +132,11 @@ const DetailedTestInfo: React.FC<Props> = ({
 
     const createTestResult = () => {
         let statusId = selectedStatus ? selectedStatus.id : test.last_status_color.id
+        // @ts-ignore
+        let comment = editorRef.current.editorInst.getMarkdown()
         const testResult = {
             status: statusId,
-            comment: comment,
+            comment: comment ?? null,
             execution_time: num ? num : null,
             test: test.id
         }
@@ -133,7 +174,7 @@ const DetailedTestInfo: React.FC<Props> = ({
                     </Grid>
                     <Grid item>
                         <Typography variant="h5">
-                            {test.case.name}
+                            {test.name}
                         </Typography>
                     </Grid>
                 </Grid>
@@ -157,39 +198,48 @@ const DetailedTestInfo: React.FC<Props> = ({
                     {test.username ?? "не назначен"}
                 </Grid>
             </Grid>
-            {test.case.estimate &&
-            (<Grid container spacing={2}>
-                <Grid item sx={{fontWeight: 'bold'}}>
-                    Время выполнения:
-                </Grid>
-                <Grid item>
-                    {test.case.estimate}
-                </Grid>
-            </Grid>)}
-            {test.case.setup &&
-            (<div>
-                <div className={classes.divBold}>
-                    Подготовка теста:
-                </div>
-                <div>
-                    {test.case.setup}
-                </div>
-            </div>)}
-            {test.case.teardown &&
-            (<div>
-                <div className={classes.divBold}>
-                    Очистка после теста:
-                </div>
-                <div>
-                    {test.case.teardown}
-                </div>
-            </div>)}
+            {description &&
+                (<div>
+                    <div className={classes.divBold}>
+                        Описание:
+                    </div>
+                    <div>
+                        <MarkdownPreview source={description} style={{whiteSpace: 'pre-wrap'}}/>
+                    </div>
+                </div>)}
+            {setup &&
+                (<div>
+                    <div className={classes.divBold}>
+                        Подготовка теста:
+                    </div>
+                    <div>
+                        <MarkdownPreview source={setup} style={{whiteSpace: 'pre-wrap'}}/>
+                    </div>
+                </div>)}
+            {teardown &&
+                (<div>
+                    <div className={classes.divBold}>
+                        Очистка после теста:
+                    </div>
+                    <div>
+                        <MarkdownPreview source={teardown} style={{whiteSpace: 'pre-wrap'}}/>
+                    </div>
+                </div>)}
+            {estimate &&
+                (<Grid container spacing={2}>
+                    <Grid item sx={{fontWeight: 'bold'}}>
+                        Ожидаемое время выполнения:
+                    </Grid>
+                    <Grid item>
+                        <MarkdownPreview source={estimate.toString()} style={{whiteSpace: 'pre-wrap'}}/>
+                    </Grid>
+                </Grid>)}
 
             <div className={classes.divBold}>
-                Описание:
+                Сценарий:
             </div>
             <div className={classes.divTestInfoScenario}>
-                {test.case.scenario}
+                <MarkdownPreview source={scenario} style={{whiteSpace: 'pre-wrap'}}/>
             </div>
 
             <Grid container spacing={1}>
@@ -202,6 +252,7 @@ const DetailedTestInfo: React.FC<Props> = ({
                             <Select
                                 value={selectedStatus ? selectedStatus.name : test.last_status_color.name}
                                 onChange={(e) => chooseStatus(e)}
+                                autoFocus={true}
                                 renderValue={(selected) => <Grid>{selected}</Grid>}>
                                 {statuses.map((status, index) => <MenuItem key={index}
                                                                            value={status as any}>{status.name}</MenuItem>)}
@@ -225,20 +276,41 @@ const DetailedTestInfo: React.FC<Props> = ({
                     <div className={classes.divBold}>
                         Комментарии:
                     </div>
-                    <TextField
-                        id="enterResultTextField"
-                        className={classes.textFieldTestplansAndTests}
-                        onChange={(content) => onChangeComment(content)}
-                        variant="outlined"
-                        value={comment}
-                        margin="normal"
-                        autoComplete="off"
-                        fullWidth
-                        multiline
-                        minRows={2}
-                        maxRows={3}
-                        label="Введите комментарии к результату теста"
-                    />
+                    {/*<TextField*/}
+                    {/*    id="enterResultTextField"*/}
+                    {/*    className={classes.textFieldTestplansAndTests}*/}
+                    {/*    onChange={(content) => onChangeComment(content)}*/}
+                    {/*    variant="outlined"*/}
+                    {/*    value={comment}*/}
+                    {/*    margin="normal"*/}
+                    {/*    autoComplete="off"*/}
+                    {/*    fullWidth*/}
+                    {/*    multiline*/}
+                    {/*    minRows={2}*/}
+                    {/*    maxRows={3}*/}
+                    {/*    label="Введите комментарии к результату теста"*/}
+                    {/*/>*/}
+                    {/*<div className="container" style={{marginTop: "2px", marginBottom: "10px"}}>*/}
+                    {/*    <MDEditor*/}
+                    {/*        value={value}*/}
+                    {/*        onChange={(str) => setValue(str ? str : "")}*/}
+                    {/*    />*/}
+                    {/*</div>*/}
+                    <div className="container" style={{marginTop: "2px", marginBottom: "10px"}}>
+                        <Editor
+                            ref={editorRef}
+                            initialValue={value}
+                            height="200px"
+                            autoFocus={false}
+                            useCommandShortcut={true}
+                            usageStatistics={false}
+                            hideModeSwitch={true}
+                            extendedAutolinks={true}
+                            toolbarItems={[
+                                ['heading', 'bold', 'italic', 'quote', 'code', 'codeblock', 'link', 'ul', 'ol', 'task']
+                            ]}
+                        />
+                    </div>
                     <Grid container spacing={1}>
                         <Grid item sx={{fontWeight: 'bold'}}>
                             Время выполнения:
@@ -248,6 +320,7 @@ const DetailedTestInfo: React.FC<Props> = ({
                                 type="number"
                                 id="executionTimeTextField"
                                 size="small"
+                                InputProps={{inputProps: {min: 0}}}
                                 onChange={(content) => onChangeExecutionTime(content)}
                                 value={num}
                                 autoComplete="off"
@@ -289,14 +362,14 @@ const DetailedTestInfo: React.FC<Props> = ({
                     Отмена
                 </Button>}
             </Grid>
-            {test.test_results.length !== 0 &&
-            (<div>
-                <div className={classes.divBold}>
-                    Предыдущие результаты:
-                </div>
-                <table>
-                    <tbody>
-                        {test.test_results.slice(0).map((testResult, index) =>
+            {test.test_results && test.test_results.length ?
+                (<div>
+                    <div className={classes.divBold}>
+                        Предыдущие результаты:
+                    </div>
+                    <table>
+                        <tbody>
+                        {test.test_results.map((testResult, index) =>
                             <tr key={index}>
                                 <TableCell sx={{maxWidth: "max-content", paddingTop: 0}}>
                                     <div>
@@ -319,18 +392,19 @@ const DetailedTestInfo: React.FC<Props> = ({
                                     </div>
                                 </TableCell>
 
-                            <TableCell align="left" sx={{verticalAlign: 'top', paddingTop: "9px"}}>
-                                <div className={classes.divBold}>
-                                    Комментарии:
-                                </div>
-                                {testResult?.comment}
-                                <Attachments attachments={attachments.get(testResult.id)}/>
-                            </TableCell>
-                        </tr>
-                    )}
-                    </tbody>
-                </table>
-            </div>)}
+                                <TableCell align="left" sx={{verticalAlign: 'top', paddingTop: "9px"}}>
+                                    <div className={classes.divBold}>
+                                        Комментарий:
+                                    </div>
+                                    <MarkdownPreview linkTarget={"_blank"} source={testResult?.comment}
+                                                     style={{whiteSpace: 'pre-wrap'}}/>
+                                    <Attachments attachments={attachments.get(testResult.id)}/>
+                                </TableCell>
+                            </tr>
+                        )}
+                        </tbody>
+                    </table>
+                </div>) : <div/>}
         </div>
     )
 }
