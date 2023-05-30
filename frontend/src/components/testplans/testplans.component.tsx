@@ -83,10 +83,6 @@ const TestplansComponent: React.FC = () => {
                         } else {
                             x.last_status_color = defaultStatus
                         }
-                        x.test_results.forEach(y => {
-                            let status = statuses.find(i => i.id === y.status)
-                            y.status_color = status ? status : defaultStatus
-                        })
                     })
                     setCurrentTestPlan(curTestPlan)
                 })

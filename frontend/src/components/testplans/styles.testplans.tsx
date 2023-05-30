@@ -119,4 +119,16 @@ export default makeStyles({
             height: "25px",
         },
     },
+    root: {
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        margin: 2,
+    },
+    textField: {
+        margin: 1,
+    },
+    button: {
+        margin: 2,
+    },
 })

@@ -289,7 +289,7 @@ const CreationTestplanComponent: React.FC<Props> = ({
             started_at: startDate ? startDate.format('YYYY-MM-DDTHH:mm') : "01.01.1970",
             due_date: endDate ? endDate.format('YYYY-MM-DDTHH:mm') : "01.01.1970",
         }
-        console.log(testPlan)
+        // console.log(testPlan)
         if (isForEdit) {
             TestPlanService.editTestPlan({
                 ...testPlan,

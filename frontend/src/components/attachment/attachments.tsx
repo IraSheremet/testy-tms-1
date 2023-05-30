@@ -10,7 +10,7 @@ interface Props {
 }
 
 const Attachments: React.FC<Props> = ({attachments}) => {
-    console.log(attachments)
+    // console.log(attachments)
     return (
         <div style={{display: 'flex', flexDirection: 'column'}}>
             {attachments && attachments.map((attachment, index) => (

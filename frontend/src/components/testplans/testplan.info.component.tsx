@@ -100,7 +100,6 @@ const TestplanInfo: React.FC<Props> = ({
                                 <TableCell className={classes.tableCellTests}>
                                     {test.name}
                                 </TableCell>
-                                {test.test_results &&
                                 <TableCell className={classes.tableCellTests}>
                                     <Chip key={index} label={test.last_status_color.name}
                                           onClick={() => {
@@ -118,7 +117,7 @@ const TestplanInfo: React.FC<Props> = ({
                                               color: "white"
                                           }}/>
 
-                                </TableCell>}
+                                </TableCell>
                                 {(!detailedTestInfo || !detailedTestInfo.show) &&
                                 (< TableCell className={classes.tableCellTests}>
                                     {moment(test.updated_at).format('DD/MM/YYYY')}

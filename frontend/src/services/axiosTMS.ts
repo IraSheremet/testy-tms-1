@@ -13,7 +13,7 @@ const axiosTMS = axios.create({
 
 axiosTMS.interceptors.request
     .use(function (config) {
-        if (config.url?.includes("api/v1/")) {
+        if (config.url?.includes("api/v1/") || config.url?.includes("plugins/")) {
             config.headers = authHeader()
         }
 
